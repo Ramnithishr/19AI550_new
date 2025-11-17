@@ -17,57 +17,257 @@ To develop a Escape from the Falling Object Game in Unity
 10. If the falling object collides with the ground, destroy the player object.
 ```  
 ### Program:
-# FallingObject.cs
+# Bullet.cs
 ```
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-public class FallingObject : MonoBehaviour
-{
-    public float fallSpeed = 1f;
+public class Bullet : MonoBehaviour {
 
-    void Update()
-    {
-        transform.position += new Vector3(0, -fallSpeed * Time.deltaTime, 0);
-    }
+	public float speed = 20f;
+	public int damage = 40;
+	public Rigidbody2D rb;
+	public GameObject impactEffect;
 
-    void OnTriggerEnter2D(Collider2D other)
-    {
-        if (other.gameObject.CompareTag("Ground"))
-        {
-            Destroy(gameObject); // Destroy the object when it hits the ground
-        }
-    }
+	// Use this for initialization
+	void Start () {
+		rb.velocity = transform.right * speed;
+	}
+
+	void OnTriggerEnter2D (Collider2D hitInfo)
+	{
+		Enemy enemy = hitInfo.GetComponent<Enemy>();
+		if (enemy != null)
+		{
+			enemy.TakeDamage(damage);
+		}
+
+		Instantiate(impactEffect, transform.position, transform.rotation);
+
+		Destroy(gameObject);
+	}
+	
 }
 
 ```
 
-# PlayerController.cs
+# CharacterController2D.cs
 ```
 
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
-{
-    public float speed = 5f;
+public class Bullet : MonoBehaviour {
 
-    void Update()
-    {
-        float move = Input.GetAxis("Horizontal"); // Get left/right key input
-        transform.position += new Vector3(move * speed * Time.deltaTime, 0, 0);
-    }
+	public float speed = 20f;
+	public int damage = 40;
+	public Rigidbody2D rb;
+	public GameObject impactEffect;
+
+	// Use this for initialization
+	void Start () {
+		rb.velocity = transform.right * speed;
+	}
+
+	void OnTriggerEnter2D (Collider2D hitInfo)
+	{
+		Enemy enemy = hitInfo.GetComponent<Enemy>();
+		if (enemy != null)
+		{
+			enemy.TakeDamage(damage);
+		}
+
+		Instantiate(impactEffect, transform.position, transform.rotation);
+
+		Destroy(gameObject);
+	}
+	
+}
+
+
+```
+
+# Enemy.cs
+```
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Enemy : MonoBehaviour {
+
+	public int health = 100;
+
+	public GameObject deathEffect;
+
+	public void TakeDamage (int damage)
+	{
+		health -= damage;
+
+		if (health <= 0)
+		{
+			Die();
+		}
+	}
+
+	void Die ()
+	{
+		Instantiate(deathEffect, transform.position, Quaternion.identity);
+		Destroy(gameObject);
+	}
+
 }
 
 ```
+
+# PlayerMovement.cs
+```
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlayerMovement : MonoBehaviour {
+
+	public CharacterController2D controller;
+	public Animator animator;
+
+	public float runSpeed = 40f;
+
+	float horizontalMove = 0f;
+	bool jump = false;
+	bool crouch = false;
+
+	// Update is called once per frame
+	void Update () {
+
+		horizontalMove = Input.GetAxisRaw("Horizontal") * runSpeed;
+
+		animator.SetFloat("Speed", Mathf.Abs(horizontalMove));
+
+		if (Input.GetButtonDown("Jump"))
+		{
+			jump = true;
+			animator.SetBool("IsJumping", true);
+		}
+
+		if (Input.GetButtonDown("Crouch"))
+		{
+			crouch = true;
+		} else if (Input.GetButtonUp("Crouch"))
+		{
+			crouch = false;
+		}
+
+	}
+
+	public void OnLanding ()
+	{
+		animator.SetBool("IsJumping", false);
+	}
+
+	public void OnCrouching (bool isCrouching)
+	{
+		animator.SetBool("IsCrouching", isCrouching);
+	}
+
+	void FixedUpdate ()
+	{
+		// Move our character
+		controller.Move(horizontalMove * Time.fixedDeltaTime, crouch, jump);
+		jump = false;
+	}
+}
+```
+
+# PrefabWeapon.cs
+```
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PrefabWeapon : MonoBehaviour {
+
+	public Transform firePoint;
+	public GameObject bulletPrefab;
+	
+	// Update is called once per frame
+	void Update () {
+		if (Input.GetButtonDown("Fire1"))
+		{
+			Shoot();
+		}
+	}
+
+	void Shoot ()
+	{
+		Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+	}
+}
+
+```
+
+# RayCastWeapon.cs
+
+```
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class RayCastWeapon : MonoBehaviour {
+
+	public Transform firePoint;
+	public int damage = 40;
+	public GameObject impactEffect;
+	public LineRenderer lineRenderer;
+	
+	// Update is called once per frame
+	void Update () {
+		if (Input.GetButtonDown("Fire1"))
+		{
+			StartCoroutine(Shoot());
+		}
+	}
+
+	IEnumerator Shoot ()
+	{
+		RaycastHit2D hitInfo = Physics2D.Raycast(firePoint.position, firePoint.right);
+
+		if (hitInfo)
+		{
+			Enemy enemy = hitInfo.transform.GetComponent<Enemy>();
+			if (enemy != null)
+			{
+				enemy.TakeDamage(damage);
+			}
+
+			Instantiate(impactEffect, hitInfo.point, Quaternion.identity);
+
+			lineRenderer.SetPosition(0, firePoint.position);
+			lineRenderer.SetPosition(1, hitInfo.point);
+		} else
+		{
+			lineRenderer.SetPosition(0, firePoint.position);
+			lineRenderer.SetPosition(1, firePoint.position + firePoint.right * 100);
+		}
+
+		lineRenderer.enabled = true;
+
+		yield return 0;
+
+		lineRenderer.enabled = false;
+	}
+}
+
+```
+
+
 ### Output:
 
-![445699345-f0ae77b1-f643-41ef-a604-3b00b31f9b10](https://github.com/user-attachments/assets/af017086-5b66-4be1-ba44-0688b3a2b095)
+![WhatsApp Image 2025-11-11 at 14 22 32_5ac4e790](https://github.com/user-attachments/assets/404cfac2-bdcc-43b7-b5f7-53a3f0d36903)
 
 
-
-![445699402-6213cc1e-28f4-49bf-a996-a848118888ce](https://github.com/user-attachments/assets/2d1d0d92-550f-4433-aff0-7bc398ff76e6)
-
-
-![445699444-1495f1f2-34bd-4138-9d7a-fbe287956aea](https://github.com/user-attachments/assets/d5f02c6b-c7a5-4b83-8106-561a51bd261d)
+![WhatsApp Image 2025-11-11 at 14 23 18_ab9706ff](https://github.com/user-attachments/assets/14940da4-3349-4621-adec-d5393157a3f3)
 
 
 ### Result:
